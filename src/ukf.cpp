@@ -14,7 +14,7 @@ using std::vector;
  */
 UKF::UKF() {
   // if this is false, laser measurements will be ignored (except during init)
-  use_laser_ = false;
+  use_laser_ = true;
 
   // if this is false, radar measurements will be ignored (except during init)
   use_radar_ = true;
@@ -26,10 +26,10 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 0.5;
+  std_a_ = 0.42;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.6;
+  std_yawdd_ = 0.38;
   
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -355,6 +355,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     if (Zsig_radar_(1,i)> M_PI) Zsig_radar_(1,i) -=2.*M_PI;
     if (Zsig_radar_(1,i)<-M_PI) Zsig_radar_(1,i) +=2.*M_PI;
   }
+  cout << "Zsig_radar_ = " << Zsig_radar_ << endl;
 
   //mean predicted measurement
   VectorXd z_pred_radar_ = VectorXd(3);
@@ -362,6 +363,8 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   for (int i=0; i < 2*n_aug_+1; i++) {
       z_pred_radar_ = z_pred_radar_ + weights_(i) * Zsig_radar_.col(i);
   }
+
+  cout << "z_pred_radar_ = " << z_pred_radar_ << endl;
 
   //measurement covariance matrix S
   S_radar_.fill(0.0);
@@ -376,16 +379,22 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     S_radar_ = S_radar_ + weights_(i) * z_diff * z_diff.transpose();
   }
 
+  cout << "S_radar_ = " << S_radar_ << endl;
+
   //add measurement noise covariance matrix
   R_radar_ <<    std_radr_*std_radr_, 0, 0,
           0, std_radphi_*std_radphi_, 0,
           0, 0,std_radrd_*std_radrd_;
   S_radar_ = S_radar_ + R_radar_;
 
+  cout << "S_radar_ plus R_radar_ = " << S_radar_ << endl;
+
   VectorXd z_radar_ = VectorXd(3);
   z_radar_(0) = meas_package.raw_measurements_[0];
   z_radar_(1) = meas_package.raw_measurements_[1];
   z_radar_(2) = meas_package.raw_measurements_[2];
+
+  cout << "z_radar_ = " << z_radar_ << endl;
 
   Tc_radar_.fill(0.0);
 
@@ -404,27 +413,27 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     if (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
 
     Tc_radar_ += weights_(i) * x_diff * z_diff.transpose();
+  }
 
-    //Kalman gain K;
+  //Kalman gain K;
   K_radar_ = Tc_radar_ * S_radar_.inverse();
 
   //residual
-  z_diff = z_radar_ - z_pred_radar_;
+  //z_diff = z_radar_ - z_pred_radar_;
 
   //angle normalization
-  if (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
-  if (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
+  //if (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
+  //if (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
 
   //update state mean and covariance matrix
-  x_ = x_ + K_radar_ * z_diff;
+  x_ = x_ + K_radar_ * (z_radar_ - z_pred_radar_);
   P_ = P_ - K_radar_*S_radar_*K_radar_.transpose();
 
   if (x_(3)> M_PI) x_(3)-=2.*M_PI;
   if (x_(3)<-M_PI) x_(3)+=2.*M_PI;
 
   // Radat NIS calculation
-  double NIS_radar_ = z_diff.transpose()*S_radar_.inverse()*z_diff;
-  }
-cout << "x_ = " << x_ << endl;
-cout << "P_ = " << P_ << endl;
+  //double NIS_radar_ = z_diff.transpose()*S_radar_.inverse()*z_diff;
+  cout << "x_ = " << x_ << endl;
+  cout << "P_ = " << P_ << endl;
 }
